@@ -26,6 +26,7 @@ class TaskDiagnostics:
     im_data: object = None
     error: object = None
     backtransform: object = None
+    copied_from: str = None  # set when this block was copied from a degenerate one
 
     @property
     def key(self):

@@ -17,6 +17,11 @@ MODES = ("diagonal", "poorman", "eigenbasis")
 # mode='poorman' refuses to run. See _check_symmetry.
 ASYMMETRY_TOLERANCE = 5.0
 
+# How far two blocks declared degenerate may differ, in error bars (rms), before
+# the copy is called into question. Independent noise on two genuinely degenerate
+# blocks already gives sqrt(2), so the tolerance sits above that.
+DEGENERACY_TOLERANCE = 3.0
+
 
 @register_dataclass
 @dataclass
@@ -67,10 +72,29 @@ class Recipe:
     rotation: dict = None
     sigma_inf: dict = None
     first_moment: dict = None
+    degenerate_blocks: tuple = None
+
+    def __post_init__(self):
+        if self.degenerate_blocks is not None:
+            self.degenerate_blocks = tuple(
+                tuple(str(b) for b in group) for group in self.degenerate_blocks
+            )
 
     @property
     def is_freq(self):
         return self.kernel_mode.startswith("freq")
+
+    @property
+    def representative(self):
+        """Copied block -> the block continued in its place.
+
+        Blocks that are continued themselves are absent, so use .get(name, name).
+        """
+        return {
+            name: group[0]
+            for group in self.degenerate_blocks or ()
+            for name in group[1:]
+        }
 
 
 @register_dataclass
@@ -219,6 +243,82 @@ def _warn_discarded_offdiag(name, data, mode):
         )
 
 
+def _block_name(names, item):
+    """The block a degeneracy group refers to.
+
+    Groups are given as block indices, which is what TRIQS' own degeneracy
+    helpers produce and what BlockGf itself accepts; block names also work.
+    """
+    if isinstance(item, bool) or not isinstance(item, (int, np.integer)):
+        return str(item)
+    if not -len(names) <= item < len(names):
+        raise ValueError(
+            "degenerate_blocks names block index {}, but the input has {} blocks "
+            "({})".format(item, len(names), names)
+        )
+    return names[item]
+
+
+def _resolve_degenerate(blocks, shapes, groups):
+    """Normalize the degeneracy groups to block names and check they
+    describe this container."""
+    if groups is None:
+        return None
+    names = [name for name, _ in blocks]
+    seen = set()
+    out = []
+    for group in groups:
+        group = tuple(_block_name(names, b) for b in group)
+        for name in group:
+            if name not in names:
+                raise ValueError(
+                    "degenerate_blocks names block '{}', which is not in the input "
+                    "(the blocks are {})".format(name, names)
+                )
+            if name in seen:
+                raise ValueError(
+                    "block '{}' appears in more than one degeneracy group; a block can "
+                    "be copied from only one other".format(name)
+                )
+            seen.add(name)
+            if shapes[name] != shapes[group[0]]:
+                raise ValueError(
+                    "blocks '{}' and '{}' are declared degenerate but have target shapes "
+                    "{} and {}; the spectra are copied element by element".format(
+                        name, group[0], shapes[name], shapes[group[0]]
+                    )
+                )
+        if len(group) > 1:
+            out.append(group)
+    return tuple(out) or None
+
+
+def _check_degeneracy(groups, tasks):
+    """A copied spectrum is only as right as the two blocks are equal, so
+    measure it, in error bars like the other input checks. validate() measures it
+    again on the result, since each copy keeps its own data."""
+    if not groups:
+        return
+    by_key = {t.key: t for t in tasks}
+    for group in groups:
+        for name in group[1:]:
+            worst = max(
+                np.sqrt(np.mean(
+                    np.abs(t.im_data - by_key[(group[0], t.i, t.j)].im_data) ** 2 / t.error ** 2
+                ))
+                for key, t in by_key.items()
+                if key[0] == name
+            )
+            if worst > DEGENERACY_TOLERANCE:
+                warnings.warn(
+                    "blocks '{}' and '{}' are declared degenerate but differ by {:.1f} error "
+                    "bars (rms); '{}' becomes a copy of '{}' and that difference is lost. "
+                    "Drop the group to continue them separately.".format(
+                        name, group[0], worst, name, group[0]
+                    )
+                )
+
+
 def _check_symmetry(name, data, errors, sel, shift):
     """poorman needs a symmetric matrix, which is stronger than hermitian.
 
@@ -308,7 +408,8 @@ def _warn_unstable_moments(g, data, n_iw, w_n, constant):
         )
 
 
-def _build(gf, grid, error, quantity, n_iw, n_tau, mode, rotation, model, moments):
+def _build(gf, grid, error, quantity, n_iw, n_tau, mode, rotation, model, moments,
+           degenerate):
     if mode not in MODES:
         raise ValueError("mode must be one of {}, got {!r}".format(MODES, mode))
     blocks = as_blocks(gf)
@@ -368,6 +469,9 @@ def _build(gf, grid, error, quantity, n_iw, n_tau, mode, rotation, model, moment
                 )
             )
 
+    degenerate = _resolve_degenerate(blocks, shapes, degenerate)
+    _check_degeneracy(degenerate, tasks)
+
     layout = GfLayout(
         block_names=tuple(n for n, _ in blocks),
         target_shapes=shapes,
@@ -382,20 +486,38 @@ def _build(gf, grid, error, quantity, n_iw, n_tau, mode, rotation, model, moment
         rotation=rotation,
         sigma_inf=None if moments is None else moments[0],
         first_moment=None if moments is None else moments[1],
+        degenerate_blocks=degenerate,
     )
     return ContinuationProblem(
         gf=gf, grid=grid, tasks=tuple(tasks), layout=layout, recipe=recipe
     )
 
 
-def gf_problem(gf, grid, error, n_iw=None, n_tau=None, mode="diagonal", rotation=None, model=None):
+def gf_problem(
+    gf,
+    grid,
+    error,
+    n_iw=None,
+    n_tau=None,
+    mode="diagonal",
+    rotation=None,
+    model=None,
+    degenerate_blocks=None,
+):
     """Build a continuation problem for a Green's function.
 
     error is required: a scalar, a 1-D array, a dict keyed by block, or a
     Gf/BlockGf of the same structure (only its real part is read).
+
+    degenerate_blocks groups blocks known to be equal, as block indices:
+    [[0, 1]] declares the first two blocks degenerate. Only the first block of
+    each group is continued; the others take a copy of its spectra, while
+    keeping their own constant and their own data. Block names work too.
     """
     rotation = _resolve_rotation(gf, mode, rotation)
-    return _build(gf, grid, error, "gf", n_iw, n_tau, mode, rotation, model, None)
+    return _build(
+        gf, grid, error, "gf", n_iw, n_tau, mode, rotation, model, None, degenerate_blocks
+    )
 
 
 def sigma_problem(
@@ -408,6 +530,7 @@ def sigma_problem(
     model=None,
     sigma_inf=None,
     model_norm=None,
+    degenerate_blocks=None,
 ):
     """Build a continuation problem for a self-energy.
 
@@ -415,6 +538,9 @@ def sigma_problem(
     unless given: Sigma_inf is subtracted from the data and re-added after the
     Kramers-Kronig transform, and the first moment sets the norm of the default
     model, because A_Sigma integrates to the first moment, not to 1.
+
+    degenerate_blocks groups blocks known to be equal, e.g. [[0, 1]]; see
+    gf_problem. Sigma_inf and the first moment are still taken per block.
     """
     rotation = _resolve_rotation(sigma_iw, mode, rotation)
     blocks = as_blocks(sigma_iw)
@@ -434,7 +560,8 @@ def sigma_problem(
             moment = _into_basis(moment_matrix(pick(model_norm, name), n), u)
         shifts[name], norms[name] = constant, moment
     return _build(
-        sigma_iw, grid, error, "sigma", n_iw, None, mode, rotation, model, (shifts, norms)
+        sigma_iw, grid, error, "sigma", n_iw, None, mode, rotation, model,
+        (shifts, norms), degenerate_blocks,
     )
 
 

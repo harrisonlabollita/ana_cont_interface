@@ -2,6 +2,7 @@ import unittest
 import warnings
 
 import numpy as np
+from triqs.gfs import BlockGf
 from triqs.mesh import MeshReFreq, MeshReFreqPts
 
 import toy
@@ -82,6 +83,82 @@ class TestBlockAndMatrix(unittest.TestCase):
         messages = [str(c.message) for c in caught]
         self.assertTrue(any("discards off-diagonal weight" in m for m in messages), messages)
 
+
+class TestDegenerateBlocks(unittest.TestCase):
+    """degenerate_blocks continues one block of each group and copies the rest."""
+
+    @classmethod
+    def setUpClass(cls):
+        w = toy.real_axis()
+        g = toy.gf_imfreq(toy.two_peaks(w))
+        cls.gb = BlockGf(name_list=["up", "dn"], block_list=[g, g.copy()])
+        cls.grid = linear_grid(-toy.WMAX, toy.WMAX, 201)
+        cls.res = solve(gf_problem(cls.gb, grid=cls.grid, error=toy.NOISE, n_iw=20,
+                                   degenerate_blocks=[[0, 1]]))
+
+    def test_only_the_representative_is_continued(self):
+        calls = []
+        import ana_cont.continuation as cont
+
+        original = cont.AnalyticContinuationProblem.solve
+        try:
+            cont.AnalyticContinuationProblem.solve = lambda self, *a, **k: (
+                calls.append(1) or original(self, *a, **k)
+            )
+            solve(gf_problem(self.gb, grid=self.grid, error=toy.NOISE, n_iw=20,
+                             degenerate_blocks=[[0, 1]]))
+        finally:
+            cont.AnalyticContinuationProblem.solve = original
+        self.assertEqual(len(calls), 1)
+
+    def test_the_copy_is_the_representative(self):
+        np.testing.assert_array_equal(self.res.a_w["dn"].data, self.res.a_w["up"].data)
+        np.testing.assert_array_equal(self.res.g_w["dn"].data, self.res.g_w["up"].data)
+
+    def test_the_copy_keeps_its_own_diagnostics_and_validates(self):
+        # without a record of its own the copied block would be silently zero in
+        # backtransform() and absent from the report
+        self.assertEqual(self.res.diag("dn", 0, 0).copied_from, "up")
+        self.assertIsNone(self.res.diag("up", 0, 0).copied_from)
+        report = validate(self.res)
+        self.assertIn(("dn", 0, 0), report.residuals)
+        self.assertTrue(report.ok, msg=str(report))
+        self.assertGreater(np.abs(report.backtransform["dn"].data).max(), 0.1)
+
+    def test_matrix_offdiagonals_are_copied_too(self):
+        w = toy.real_axis()
+        g = toy.gf_imfreq([toy.two_peaks(w), toy.one_peak(w)], offdiag=0.3)
+        gb = BlockGf(name_list=["up", "dn"], block_list=[g, g.copy()])
+        res = solve(gf_problem(gb, grid=self.grid, error=toy.NOISE, n_iw=20,
+                               mode="poorman", degenerate_blocks=[[0, 1]]))
+        np.testing.assert_array_equal(res.a_w["dn"].data, res.a_w["up"].data)
+        self.assertEqual(len(res.diagnostics), 6)
+        self.assertEqual(res.diag("dn", 0, 1).copied_from, "up")
+
+    def test_indices_and_names_are_the_same_group(self):
+        prob = gf_problem(self.gb, grid=self.grid, error=toy.NOISE, n_iw=20,
+                          degenerate_blocks=[["up", "dn"]])
+        self.assertEqual(prob.recipe.degenerate_blocks, (("up", "dn"),))
+        self.assertEqual(prob.recipe.representative, {"dn": "up"})
+
+    def test_an_out_of_range_index_is_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            gf_problem(self.gb, grid=self.grid, error=toy.NOISE, n_iw=20,
+                       degenerate_blocks=[[0, 2]])
+        self.assertIn("2 blocks", str(caught.exception))
+
+    def test_an_unknown_block_name_is_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            gf_problem(self.gb, grid=self.grid, error=toy.NOISE, n_iw=20,
+                       degenerate_blocks=[["up", "nope"]])
+        self.assertIn("not in the input", str(caught.exception))
+
+    def test_a_block_in_two_groups_is_rejected(self):
+        with self.assertRaises(ValueError):
+            gf_problem(self.gb, grid=self.grid, error=toy.NOISE, n_iw=20,
+                       degenerate_blocks=[[0, 1], [1]])
+
+
 class TestInputValidation(unittest.TestCase):
     def setUp(self):
         self.g = toy.gf_imfreq(toy.two_peaks(toy.real_axis()))
@@ -116,8 +193,6 @@ class TestInputValidation(unittest.TestCase):
     def test_blocks_must_share_one_mesh(self):
         # one frequency selection is applied to every block, so a block with a
         # different mesh would be sliced at the wrong points
-        from triqs.gfs import BlockGf
-
         w = toy.real_axis()
         gb = BlockGf(
             name_list=["up", "dn"],

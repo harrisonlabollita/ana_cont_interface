@@ -1,6 +1,7 @@
 """Map a ContinuationProblem onto ana_cont and reassemble TRIQS containers."""
 
 import warnings
+from dataclasses import replace
 
 import numpy as np
 
@@ -8,7 +9,7 @@ import ana_cont.continuation as cont
 
 from ._util import build_container, moment_matrix, norb, pick
 from .models import flat_model, poorman_model
-from .result import ContinuationResult, SigmaResult, TaskDiagnostics
+from .result import ContinuationResult, SigmaResult, TaskDiagnostics, _lookup
 
 ALPHA_DETERMINATION = ("chi2kink", "classic", "historic", "bryan")
 OPTIMIZERS = ("newton", "scipy_lm")
@@ -45,9 +46,15 @@ def solve(problem, alpha_determination="chi2kink", optimizer="newton", preblur=0
     )
 
     # a stable sort puts every diagonal task before every off-diagonal one, so
-    # the poorman models can be built from the diagonal spectra as we go
+    # the poorman models can be built from the diagonal spectra as we go, and
+    # every continued block before the blocks that copy from it
+    source = problem.recipe.representative
     spectra, diagnostics = {}, []
-    for task in sorted(problem.tasks, key=lambda t: t.offdiag):
+    for task in sorted(problem.tasks, key=lambda t: (t.offdiag, t.block in source)):
+        if task.block in source:
+            spectra[task.key] = spectra[(source[task.block], task.i, task.j)]
+            diagnostics.append(_copied_record(task, diagnostics, source[task.block]))
+            continue
         model = task.model
         if model is None:
             model = (
@@ -62,6 +69,23 @@ def solve(problem, alpha_determination="chi2kink", optimizer="newton", preblur=0
         spectra[task.key] = spectrum
         diagnostics.append(record)
     return _assemble(problem, spectra, tuple(diagnostics))
+
+
+def _copied_record(task, diagnostics, source):
+    """Diagnostics for a block copied from a degenerate one.
+
+    The solution is the source's, but the data, error bars and constant are the
+    copy's own, so validate() measures the fit and the degeneracy claim together.
+    """
+    record = _lookup(diagnostics, source, task.i, task.j)
+    return replace(
+        record,
+        block=task.block,
+        im_data=task.im_data,
+        error=task.error,
+        shift=task.shift,
+        copied_from=source,
+    )
 
 
 def _check_alpha_range(kwargs):

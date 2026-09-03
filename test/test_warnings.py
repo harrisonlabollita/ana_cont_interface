@@ -31,6 +31,31 @@ class TestWarnings(unittest.TestCase):
             msg="no warning containing {!r}; got {}".format(fragment, found),
         )
 
+    def test_blocks_that_are_not_degenerate(self):
+        from triqs.gfs import BlockGf
+
+        gb = BlockGf(
+            name_list=["up", "dn"],
+            block_list=[toy.gf_imfreq(toy.two_peaks(self.w)),
+                        toy.gf_imfreq(toy.one_peak(self.w))],
+        )
+        self.assertWarns_containing(
+            "declared degenerate but differ",
+            lambda: gf_problem(gb, grid=self.grid, error=toy.NOISE, n_iw=20,
+                               degenerate_blocks=[[0, 1]]),
+        )
+
+    def test_independent_noise_on_degenerate_blocks_is_not_flagged(self):
+        # two blocks with the same spectrum but independent noise differ by
+        # sqrt(2) error bars; that must not read as a broken degeneracy
+        gb = toy.block_gf_imfreq(spectra=toy.two_peaks(self.w))
+        found = messages(
+            lambda: gf_problem(gb, grid=self.grid, error=toy.NOISE, n_iw=20,
+                               degenerate_blocks=[[0, 1]]),
+            ours_only=True,
+        )
+        self.assertEqual([m for m in found if "degenerate" in m], [])
+
     def test_non_hermitian_input(self):
         g = toy.gf_imfreq(toy.two_peaks(self.w), noise=0.0)
         g.data[toy.N_IW] += 1e-2  # break G(-iw) = conj(G(iw))
