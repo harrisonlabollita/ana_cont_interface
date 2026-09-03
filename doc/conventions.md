@@ -33,4 +33,4 @@ with HDFArchive('cont.h5', 'w') as ar:
   A genuinely complex-hermitian off-diagonal element is not representable this way; use
   `mode='eigenbasis'`.
 - DLR meshes are rejected with a message telling you to convert first.
-- The continuation loop over elements is serial. It is embarrassingly parallel.
+- The continuation loop over elements is serial. 

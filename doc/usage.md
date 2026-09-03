@@ -71,17 +71,6 @@ rotated into the working basis on the way in and back out again, so `res.sigma_i
 non-positive diagonal first moment is warned about rather than passed through `abs()`, since
 `A_Sigma` integrates to a positive number and a negative estimate means the estimate is wrong.
 
-**Choosing `n_iw` for a self-energy.** The spectral weight of `A_Sigma` is fixed by the `1/(i w_n)`
-tail, so truncating `n_iw` too aggressively loosens the constraint on it — the fit gets better
-while the weight drifts. Measured on real SrVO3 CTHYB data (beta=40, 1025 frequencies):
-
-| `n_iw` | `w_n` max | rms residual/error | moment error | Z |
-|---|---|---|---|---|
-| 120  |  18.8 | 0.79 | 18.3% | 0.682 |
-| 300  |  47.0 | 1.72 | 12.9% | 0.679 |
-| 600  |  94.2 | 2.06 |  9.5% | 0.678 |
-| 1025 | 160.9 | 1.92 |  7.4% | 0.677 |
-
 `check_moments` is what makes that trade visible; the quasiparticle weight is barely affected
 either way. For a Green's function the sum rule is enforced by the kernel itself and the same
 pressure does not apply.
@@ -90,13 +79,6 @@ pressure does not apply.
 `sigma_inf=` / `model_norm=`:
 
     Re Sigma(i w_n) -> Sigma_inf        -Im Sigma(i w_n) * w_n -> first moment
-
-each averaged over the top decile of Matsubara frequencies. `fit_hermitian_tail` is *not* used
-here: it is dominated by noise in exactly that region. On this package's toy self-energy it
-returns `Sigma_inf` = 1.19 (true 2.5) and a **negative** first moment at 1e-3 noise, which is not
-a usable norm; the averages above stay within 2e-4 and 2% respectively across 1e-5 to 1e-3 noise.
-Subtracting a wrong constant is fatal — a constant is not in the span of the kernel, so chi2
-explodes rather than degrading gracefully.
 
 The first moment sets the *norm of the default model*, because `A_Sigma` integrates to the first
 moment, not to 1.
