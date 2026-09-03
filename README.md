@@ -56,3 +56,7 @@ plausible-looking but meaningless spectrum.
 Fermionic `MeshImFreq` and `MeshImTime`, Green's functions and self-energies, diagonal and
 matrix-valued. No bosonic kernels and no Pade yet. Verified against real SrVO3 CTHYB data: the
 quasiparticle weight from the continued `Sigma(w)` agrees with the Matsubara estimate to under 1%.
+
+## License
+
+MIT, the same as [`ana_cont`](https://github.com/josefkaufmann/ana_cont).

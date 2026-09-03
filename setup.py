@@ -5,6 +5,7 @@ setup(
     version="0.1.0",
     description="TRIQS front-end for the ana_cont analytic continuation library",
     author="Harrison LaBollita",
+    license="MIT",
     packages=find_packages(exclude=["test"]),
     python_requires=">=3.9",
     install_requires=["numpy", "scipy"],
