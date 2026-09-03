@@ -112,6 +112,33 @@ is only equal to it when the off-diagonal spectra are real, which fails after a 
 All blocks of a `BlockGf` must share one mesh, since a single frequency selection is applied to
 every block.
 
+## Degenerate blocks
+
+A continuation costs a maxent solve per matrix element, so blocks that are equal by symmetry are
+paid for twice. Declare them and only the first block of each group is continued:
+
+```python
+prob = gf_problem(g_iw, grid=grid, error=err, n_iw=60,
+                  degenerate_blocks=[[0, 1]])                # one solve, not two
+prob.recipe.degenerate_blocks                                # (('up', 'dn'),)
+prob.recipe.representative                                   # {'dn': 'up'}
+res.diag('dn', 0, 0).copied_from                             # 'up'
+```
+
+`degenerate_blocks` is a `List[List[int]]` of block indices into the input, the form TRIQS'
+degeneracy helpers produce and that `BlockGf` itself accepts; block names work as well, and the
+groups are recorded as names either way. The first entry of each group is the block continued.
+
+The copies are exact — the same spectrum, so the same `a_w` and `g_w` — but each keeps **its own**
+constant (`Sigma_inf` and the first moment are still taken per block) and its own data and error
+bars. Keeping the data is what makes the copy checkable: `validate` compares each block's own
+input against the representative's backtransform, so a group that is not really degenerate shows
+up as a large residual rather than as a silently duplicated block. It is also measured at build
+time, in error bars, and warned about there.
+
+The tolerance sits at 3 error bars (rms) because two genuinely degenerate blocks with independent
+QMC noise already differ by `sqrt(2)`.
+
 ## Solver options
 
 `alpha_determination` accepts `'chi2kink'` (default), `'classic'`, `'historic'` and `'bryan'`;

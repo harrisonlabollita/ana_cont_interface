@@ -44,8 +44,8 @@ plausible-looking but meaningless spectrum.
 
 ## Documentation
 
-- [`doc/usage.md`](doc/usage.md) — imaginary time, self-energies, matrix-valued input, the
-  preblur scan, solver options
+- [`doc/usage.md`](doc/usage.md) — imaginary time, self-energies, matrix-valued input,
+  degenerate blocks, the preblur scan, solver options
 - [`doc/validation.md`](doc/validation.md) — `backtransform`, `check_moments`, `validate`
 - [`doc/conventions.md`](doc/conventions.md) — what is applied internally, warnings, HDF5,
   limitations
