@@ -6,6 +6,7 @@ from .models import flat_model, gaussian_model, poorman_model, super_gaussian_mo
 from .problem import ContinuationProblem, ContinuationTask, gf_problem, sigma_problem
 from .result import ContinuationResult, SigmaResult, TaskDiagnostics
 from .solve import solve
+from .validate import ValidationReport, backtransform, check_moments, validate
 
 __all__ = [
     "RealGrid",
@@ -24,4 +25,8 @@ __all__ = [
     "ContinuationResult",
     "SigmaResult",
     "TaskDiagnostics",
+    "backtransform",
+    "check_moments",
+    "validate",
+    "ValidationReport",
 ]
