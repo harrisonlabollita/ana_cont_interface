@@ -5,6 +5,7 @@ from .grids import RealGrid, linear_grid, tangent_grid
 from .models import flat_model, gaussian_model, poorman_model, super_gaussian_model
 from .problem import ContinuationProblem, ContinuationTask, gf_problem, sigma_problem
 from .result import ContinuationResult, SigmaResult, TaskDiagnostics
+from .solve import solve
 
 __all__ = [
     "RealGrid",
@@ -19,6 +20,7 @@ __all__ = [
     "ContinuationTask",
     "gf_problem",
     "sigma_problem",
+    "solve",
     "ContinuationResult",
     "SigmaResult",
     "TaskDiagnostics",
