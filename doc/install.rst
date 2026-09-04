@@ -25,9 +25,9 @@ Prerequisites
 Installation steps
 ------------------
 
-#. Download the source code of the latest stable version by cloning the ``TRIQS/ana_cont_interface`` repository from GitHub::
+#. Download the source code of the latest stable version by cloning the ``harrisonlabollita/ana_cont_interface`` repository from GitHub::
 
-     $ git clone https://github.com/TRIQS/ana_cont_interface ana_cont_interface.src
+     $ git clone https://github.com/harrisonlabollita/ana_cont_interface ana_cont_interface.src
 
 #. Create and move to a new directory where you will compile the code::
 

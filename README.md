@@ -19,7 +19,7 @@ Then build against TRIQS, as with any TRIQS application:
 
 ```bash
 source path_to_triqs/share/triqs/triqsvars.sh
-git clone https://github.com/TRIQS/ana_cont_interface ana_cont_interface.src
+git clone https://github.com/harrisonlabollita/ana_cont_interface ana_cont_interface.src
 mkdir ana_cont_interface.build && cd ana_cont_interface.build
 cmake ../ana_cont_interface.src
 make

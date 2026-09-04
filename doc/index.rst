@@ -11,7 +11,7 @@ triqs_ana_cont_interface
       .. image:: _static/logo_github.png
          :width: 75%
          :align: center
-         :target: https://github.com/TRIQS/ana_cont_interface
+         :target: https://github.com/harrisonlabollita/ana_cont_interface
 
 
 A :ref:`TRIQS <triqslibs:welcome>` front-end for `ana_cont

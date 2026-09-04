@@ -7,7 +7,7 @@ set     version     @PROJECT_VERSION@
 set     root        @CMAKE_INSTALL_PREFIX@
 set     git_hash    @PROJECT_GIT_HASH@
 
-set     url         "https://github.com/TRIQS/ana_cont_interface"
+set     url         "https://github.com/harrisonlabollita/ana_cont_interface"
 set     description "A TRIQS front-end for the ana_cont analytic continuation library."
 
 module-whatis   "$description"
