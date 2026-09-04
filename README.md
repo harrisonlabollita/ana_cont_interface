@@ -76,4 +76,6 @@ quasiparticle weight from the continued `Sigma(w)` agrees with the Matsubara est
 
 ## License
 
-MIT, the same as [`ana_cont`](https://github.com/josefkaufmann/ana_cont).
+GPLv3, the same as TRIQS — see [`LICENSE.txt`](LICENSE.txt) and [`COPYING.txt`](COPYING.txt).
+The continuation itself is done by [`ana_cont`](https://github.com/josefkaufmann/ana_cont),
+which is MIT-licensed and is not redistributed here.
