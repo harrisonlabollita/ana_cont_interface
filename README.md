@@ -7,12 +7,29 @@ output.
 
 ## Install
 
-Needs `triqs` and `ana_cont` importable; neither is pip-installable, so neither is declared as a
-dependency.
+Needs [TRIQS](https://triqs.github.io/triqs) 4.0 and
+[`ana_cont`](https://github.com/josefkaufmann/ana_cont) importable by the same python
+interpreter. `ana_cont` is not on PyPI, so install it from source first:
 
 ```bash
-pip install -e .
+git clone https://github.com/josefkaufmann/ana_cont && pip install ./ana_cont
 ```
+
+Then build against TRIQS, as with any TRIQS application:
+
+```bash
+source path_to_triqs/share/triqs/triqsvars.sh
+git clone https://github.com/TRIQS/ana_cont_interface ana_cont_interface.src
+mkdir ana_cont_interface.build && cd ana_cont_interface.build
+cmake ../ana_cont_interface.src
+make
+make test
+make install
+```
+
+Without `-DCMAKE_INSTALL_PREFIX=...` the package installs into `TRIQS_ROOT` and is
+importable straight away. For a custom prefix, source the generated
+`share/triqs_ana_cont_interface/triqs_ana_cont_interfacevars.sh` afterwards.
 
 ## Usage
 

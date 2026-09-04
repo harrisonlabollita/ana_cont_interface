@@ -1,8 +1,9 @@
 __pycache__/
 *.pyc
-*.egg-info/
 build/
-dist/
+*.build/
 .venv
 .coverage
 htmlcov/
+compile_commands.json
+doc/_autosummary

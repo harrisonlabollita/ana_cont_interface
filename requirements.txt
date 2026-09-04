@@ -1,0 +1,15 @@
+# Required python packages for this application.
+#
+# ana_cont performs the continuation itself and is a hard runtime requirement,
+# but it is not on PyPI and so cannot be listed here. Install it from
+# https://github.com/josefkaufmann/ana_cont
+numpy
+scipy
+# For documentation builds we additionaly require
+#sphinx
+#numpydoc
+#nbsphinx
+#sphinx_rtd_theme
+#myst_parser
+#linkify-it-py
+#matplotlib
